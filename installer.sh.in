@@ -1164,7 +1164,7 @@ copy_rootfs() {
 }
 
 install_packages() {
-    local _grub= _syspkg=
+    local _grub= _syspkg= _linux=
 
     if [ -n "$EFI_SYSTEM" ]; then
         if [ $EFI_FW_BITS -eq 32 ]; then
@@ -1178,22 +1178,21 @@ install_packages() {
 
     _syspkg="base-system"
 
-    mkdir -p $TARGETDIR/var/db/xbps/keys $TARGETDIR/usr/share
-    cp -a /usr/share/xbps.d $TARGETDIR/usr/share/
+    mkdir -p $TARGETDIR/var/db/xbps/keys
     cp /var/db/xbps/keys/*.plist $TARGETDIR/var/db/xbps/keys
     mkdir -p $TARGETDIR/boot/grub
 
     _arch=$(xbps-uhelper arch)
 
     stdbuf -oL env XBPS_ARCH=${_arch} \
-        xbps-install  -r $TARGETDIR -SyU ${_syspkg} ${_grub} 2>&1 | \
+        xbps-install -r $TARGETDIR -C /usr/share/xbps.d -Sy ${_syspkg} ${_grub} 2>&1 | \
         DIALOG --title "Installing base system packages..." \
         --programbox 24 80
     if [ $? -ne 0 ]; then
         DIE 1
     fi
-    xbps-reconfigure -r $TARGETDIR -f base-files >/dev/null 2>&1
-    chroot $TARGETDIR xbps-reconfigure -a
+    _linux=$(chroot $TARGETDIR xbps-query -p pkgver linux | sed 's/linux-\([0-9]\.[0-9]\+\)_.*/linux\1/')
+    chroot $TARGETDIR xbps-reconfigure -f ${_linux} ${_grub} >/dev/null 2>&1
 }
 
 enable_dhcpd() {
